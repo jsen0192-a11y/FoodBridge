@@ -5,6 +5,9 @@ const {
   getDonations, 
   getNearbyDonations, 
   acceptDonation, 
+  rejectDonation,
+  ngoRegister,
+  ngoLogin,
   requestVolunteer, 
   verifyDeliveryCode,
   exportDonationsCSV,
@@ -14,6 +17,10 @@ const {
   getPickupDetails
 } = require('../controllers/donationController');
 const { protect, authorize } = require('../middleware/auth');
+
+// NGO Specific auth endpoints
+router.post('/ngo/auth/register', ngoRegister);
+router.post('/ngo/auth/login', ngoLogin);
 
 // Define specific routes first to avoid clashes with parameters
 router.get('/report/csv', protect, authorize('admin'), exportDonationsCSV);
@@ -27,6 +34,7 @@ router.get('/:id/pickup', protect, getPickupDetails);
 router.post('/', protect, authorize('donor'), createDonation);
 router.get('/', protect, getDonations);
 router.put('/:id/accept', protect, authorize('ngo'), acceptDonation);
+router.put('/:id/reject', protect, authorize('ngo'), rejectDonation);
 router.put('/:id/assign-volunteer', protect, authorize('ngo'), requestVolunteer);
 router.post('/:id/verify-code', protect, verifyDeliveryCode);
 

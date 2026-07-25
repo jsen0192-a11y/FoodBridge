@@ -1,59 +1,16 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import Landing from './pages/Landing';
-import Login from './pages/Login';
-import Register from './pages/Register';
 import DonorDashboard from './pages/DonorDashboard';
 import NgoDashboard from './pages/NgoDashboard';
-import VolunteerDashboard from './pages/VolunteerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 
-// Route Protection Wrapper
-function ProtectedRoute({ children, allowedRoles }) {
-  const { user, loading } = useAuth();
-  const location = useLocation();
-
-  if (loading) {
-    return (
-      <div className="loading-page">
-        <div className="spinner"></div>
-        <p>Initializing FoodBridge...</p>
-        <style>{`
-          .loading-page {
-            height: calc(100vh - 75px);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-secondary);
-          }
-          .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid var(--border-color);
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 1rem;
-          }
-          @keyframes spin { 100% { transform: rotate(360deg); } }
-        `}</style>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to={`/dashboard/${user.role}`} replace />;
-  }
-
+// Route Protection Wrapper (Bypassed: Allows all dashboards directly)
+function ProtectedRoute({ children }) {
   return children;
 }
 
@@ -74,20 +31,17 @@ function MainAppRoutes() {
     <div className="app-main-wrapper">
       <Navbar />
       <Routes>
-        {/* Public Routes */}
+        {/* Public Landing Home */}
         <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
 
         {/* Donor Dashboard */}
         <Route 
           path="/dashboard/donor/*" 
           element={
-            <ProtectedRoute allowedRoles={['donor']}>
+            <ProtectedRoute>
               <DashboardLayout role="donor">
                 <Routes>
                   <Route path="/" element={<DonorDashboard />} />
-                  <Route path="/history" element={<DonorDashboard />} /> {/* Combined view handles tabs */}
                 </Routes>
               </DashboardLayout>
             </ProtectedRoute>
@@ -98,25 +52,10 @@ function MainAppRoutes() {
         <Route 
           path="/dashboard/ngo/*" 
           element={
-            <ProtectedRoute allowedRoles={['ngo']}>
+            <ProtectedRoute>
               <DashboardLayout role="ngo">
                 <Routes>
                   <Route path="/" element={<NgoDashboard />} />
-                  <Route path="/accepted" element={<NgoDashboard />} />
-                </Routes>
-              </DashboardLayout>
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* Volunteer Dashboard */}
-        <Route 
-          path="/dashboard/volunteer/*" 
-          element={
-            <ProtectedRoute allowedRoles={['volunteer']}>
-              <DashboardLayout role="volunteer">
-                <Routes>
-                  <Route path="/" element={<VolunteerDashboard />} />
                 </Routes>
               </DashboardLayout>
             </ProtectedRoute>
@@ -127,12 +66,10 @@ function MainAppRoutes() {
         <Route 
           path="/dashboard/admin/*" 
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute>
               <DashboardLayout role="admin">
                 <Routes>
                   <Route path="/" element={<AdminDashboard />} />
-                  <Route path="/verifications" element={<AdminDashboard />} />
-                  <Route path="/users" element={<AdminDashboard />} />
                 </Routes>
               </DashboardLayout>
             </ProtectedRoute>

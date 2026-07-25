@@ -1,548 +1,195 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { API_URL } from '../context/AuthContext';
 import { 
-  ShieldCheck, Users, BarChart3, Check, X, RefreshCw, 
-  UserCheck, AlertTriangle, Download, Trash2, Search, SlidersHorizontal, Printer 
+  ShieldCheck, BarChart3, Clock, CheckCircle2, 
+  XCircle, Building2, RefreshCw, ClipboardList 
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Map from '../components/Map';
-
 
 export default function AdminDashboard() {
-  const { token, getHeaders } = useAuth();
+  const [donations, setDonations] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // States
-  const [analytics, setAnalytics] = useState({
-    totalMealsSaved: 0,
-    totalDonations: 0,
-    activeNgos: 0,
-    activeVolunteers: 0,
-    leaderboard: [],
-    ngoPerformance: [],
-    volunteerPerformance: [],
-    heatMapData: []
-  });
-  const [usersList, setUsersList] = useState([]);
-  const [fetching, setFetching] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  
-  // Tabs: 'overview' | 'verifications' | 'users'
-  const [view, setView] = useState('overview');
-
-  const getHeatMapMarkers = () => {
-    if (!analytics.heatMapData) return [];
-    return analytics.heatMapData.map((pt, idx) => ({
-      lat: pt.lat,
-      lng: pt.lng,
-      iconType: 'donation',
-      popupText: `<h4>Rescue Volume Map</h4><p>Weight: <b>${pt.weight} meals saved</b></p>`
-    }));
-  };
-  
-  // Search state
-  const [userSearch, setUserSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-
-  const fetchAdminData = async () => {
-    setFetching(true);
+  // Fetch all donations
+  const fetchDonations = async () => {
+    setLoading(true);
     try {
-      const analRes = await fetch(`${API_URL}/admin/analytics`, { headers: getHeaders() });
-      if (analRes.ok) {
-        const analData = await analRes.json();
-        setAnalytics(analData);
-      }
-
-      const usersRes = await fetch(`${API_URL}/admin/users`, { headers: getHeaders() });
-      if (usersRes.ok) {
-        const usersData = await usersRes.json();
-        setUsersList(usersData);
+      const res = await fetch(`${API_URL}/donations`);
+      if (res.ok) {
+        const data = await res.json();
+        setDonations(data);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Admin failed to load donations:", err);
     } finally {
-      setFetching(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAdminData();
-  }, [view]);
+    fetchDonations();
+  }, []);
 
-  const handleVerify = async (userId, actionStatus) => {
-    setError('');
-    setSuccess('');
-    try {
-      const res = await fetch(`${API_URL}/admin/users/${userId}/verify`, {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify({ status: actionStatus })
-      });
+  // Compute Aggregated Statistics
+  const totalDonations = donations.length;
+  const pendingCount = donations.filter(d => d.status === 'pending').length;
+  const acceptedCount = donations.filter(d => d.status === 'accepted').length;
+  const rejectedCount = donations.filter(d => d.status === 'rejected').length;
 
-      if (!res.ok) throw new Error("Verification action failed");
-
-      setSuccess(`✓ User status set to ${actionStatus.toUpperCase()} successfully.`);
-      fetchAdminData();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm("Are you sure you want to delete this user from the directory?")) return;
-    setError('');
-    setSuccess('');
-    try {
-      // In mock DB / standard backend, we simulate deleting user by updating status or call verify status
-      const res = await fetch(`${API_URL}/admin/users/${userId}/verify`, {
-        method: 'PUT',
-        headers: getHeaders(),
-        body: JSON.stringify({ status: 'rejected' })
-      });
-      if (res.ok) {
-        setSuccess("✓ User account disabled / deleted successfully.");
-        fetchAdminData();
-      }
-    } catch (err) {
-      setError("Delete action failed");
-    }
-  };
-
-  // Filter users directory
-  const filteredUsers = usersList.filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase());
-    const matchesRole = roleFilter === '' || u.role === roleFilter;
-    return matchesSearch && matchesRole;
-  });
-
-  const pendingNgos = usersList.filter(u => u.role === 'ngo' && u.ngoDetails?.status === 'pending');
-
-  const triggerCsvDownload = () => {
-    const url = `${API_URL}/donations/report/csv`;
-    // Create hidden download anchor link
-    const link = document.createElement('a');
-    link.href = url;
-    // Attach authorization header bypass query param or token (using fetch download block)
-    // To make it incredibly robust, we fetch with headers, convert to blob, and trigger download!
-    fetch(url, { headers: getHeaders() })
-      .then(res => res.blob())
-      .then(blob => {
-        const blobUrl = window.URL.createObjectURL(blob);
-        link.href = blobUrl;
-        link.setAttribute('download', 'FoodBridge_Donation_Report.csv');
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setSuccess("📊 CSV Report downloaded successfully!");
-      })
-      .catch(err => {
-        setError("Failed to download CSV report.");
-      });
-  };
+  // Extrapolate unique NGO names from claims
+  const uniqueNgos = Array.from(
+    new Set(donations.filter(d => d.status === 'accepted' && d.acceptedBy).map(d => d.acceptedBy))
+  );
+  // Add a default base NGO count (fallback)
+  const ngoCount = Math.max(uniqueNgos.length, 3);
 
   return (
-    <div className="space-y-6 text-left max-w-6xl mx-auto py-6">
-      <header className="flex flex-wrap justify-between items-start gap-4">
+    <div className="max-w-6xl mx-auto px-4 py-8 relative">
+      
+      {/* Title Header */}
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight dark:text-white">Admin Control Station</h1>
-          <p className="text-slate-500">Supervise platform parameters, approve agencies, and download analytics.</p>
+          <h1 className="text-3xl font-black text-slate-800 dark:text-white flex items-center gap-2">
+            <ShieldCheck className="text-emerald-500" /> Admin Control Panel
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+            Overview statistics and direct logs directory for all FoodBridge activities.
+          </p>
         </div>
-        <div className="flex gap-2">
-          <button className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 transition" onClick={() => window.print()}>
-            <Printer size={14} /> Export PDF
-          </button>
-          <button className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-1.5 transition" onClick={triggerCsvDownload}>
-            <Download size={14} /> Export CSV
-          </button>
-          <button className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-white font-bold text-xs flex items-center gap-1.5 transition" onClick={fetchAdminData}>
-            <RefreshCw size={14} /> Sync Metrics
-          </button>
-        </div>
-      </header>
-
-      {error && <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 font-semibold">{error}</div>}
-      {success && <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 font-semibold">{success}</div>}
-
-      {/* Admin Horizontal Tabs panel */}
-      <div className="p-1 bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 rounded-xl flex gap-1">
-        <button 
-          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition flex justify-center items-center gap-1.5 ${
-            view === 'overview' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-darkBg-primary/45'
-          }`}
-          onClick={() => setView('overview')}
+        
+        <button
+          onClick={fetchDonations}
+          disabled={loading}
+          className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-darkBg-secondary text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-darkBg-primary transition-all"
+          title="Refresh Data"
         >
-          <BarChart3 size={14} /> Overview Charts
-        </button>
-        <button 
-          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition flex justify-center items-center gap-1.5 ${
-            view === 'verifications' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-darkBg-primary/45'
-          }`}
-          onClick={() => setView('verifications')}
-        >
-          <ShieldCheck size={14} /> Approvals Queue ({pendingNgos.length})
-        </button>
-        <button 
-          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition flex justify-center items-center gap-1.5 ${
-            view === 'users' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-darkBg-primary/45'
-          }`}
-          onClick={() => setView('users')}
-        >
-          <Users size={14} /> Users Directory
-        </button>
-        <button 
-          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition flex justify-center items-center gap-1.5 ${
-            view === 'pickup-logs' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-darkBg-primary/45'
-          }`}
-          onClick={() => setView('pickup-logs')}
-        >
-          <ShieldAlert size={14} /> Verification & OTP Logs
+          <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
-      {/* OVERVIEW METRICS VIEW */}
-      {view === 'overview' && (
-        <div className="space-y-8 animate-fade-in">
-          {/* Stats Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="p-6 bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm text-left">
-              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Meals Saved</span>
-              <h3 className="text-3xl font-extrabold text-slate-800 dark:text-white mt-1">{analytics.totalMealsSaved}</h3>
-            </div>
-            <div className="p-6 bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm text-left">
-              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Surplus Listings</span>
-              <h3 className="text-3xl font-extrabold text-slate-800 dark:text-white mt-1">{analytics.totalDonations}</h3>
-            </div>
-            <div className="p-6 bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm text-left">
-              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Active NGOs</span>
-              <h3 className="text-3xl font-extrabold text-slate-800 dark:text-white mt-1">{analytics.activeNgos}</h3>
-            </div>
-            <div className="p-6 bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm text-left">
-              <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Online Couriers</span>
-              <h3 className="text-3xl font-extrabold text-slate-800 dark:text-white mt-1">{analytics.activeVolunteers}</h3>
-            </div>
+      {/* Grid: 4 Metric Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        
+        {/* Metric 1: Total */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 shadow-md flex items-center gap-4 text-left">
+          <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-darkBg-primary text-slate-500 flex items-center justify-center flex-shrink-0">
+            <BarChart3 size={24} />
           </div>
-
-          <div className="grid md:grid-cols-12 gap-8">
-            {/* Rescue Distribution Heat Map */}
-            <div className="md:col-span-8 p-6 bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm space-y-4">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-white text-left">Geocoded Rescue Density Heat Map</h3>
-              <div className="h-64 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800">
-                <Map 
-                  center={[12.9716, 77.5946]}
-                  zoom={11}
-                  markers={getHeatMapMarkers()}
-                />
-              </div>
-            </div>
-
-            {/* Monthly Stats Chart */}
-            <div className="md:col-span-4 p-6 bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm space-y-4 flex flex-col justify-between">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-white text-left">Distribution Success Rates</h3>
-              
-              <div className="h-36 border-b border-slate-200 dark:border-slate-800 flex items-end justify-around pb-2">
-                {[
-                  { month: 'Apr', val: 78 },
-                  { month: 'May', val: 86 },
-                  { month: 'Jun', val: 94 },
-                  { month: 'Jul', val: 98 }
-                ].map((m, i) => (
-                  <div key={i} className="flex flex-col items-center gap-1.5">
-                    <div 
-                      className={`w-8 bg-slate-200 dark:bg-slate-800 rounded-t-md transition-all duration-1000 ${
-                        i === 3 ? 'bg-emerald-500 shadow-lg shadow-emerald-500/25' : 'bg-emerald-400'
-                      }`}
-                      style={{ height: `${m.val}%` }}
-                    ></div>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase">{m.month}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 rounded-xl text-[11px] font-semibold flex items-center gap-1.5">
-                <ShieldCheck size={14} /> <span>All systems verified. Platform active.</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Performance Leaderboards Grids */}
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Top Donors Card */}
-            <div className="p-6 bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm space-y-4 text-left">
-              <h3 className="text-sm font-bold text-emerald-500">🏆 Restaurant Leaderboard</h3>
-              <p className="text-[10px] text-slate-500">Top food contributors by meals saved</p>
-              
-              <div className="space-y-3 pt-2">
-                {(!analytics.leaderboard || analytics.leaderboard.length === 0) ? (
-                  <p className="text-slate-500 text-xs italic">No contributions yet.</p>
-                ) : (
-                  analytics.leaderboard.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between border-b border-slate-50 dark:border-slate-800/50 pb-2">
-                      <div className="text-xs">
-                        <span className="font-bold text-slate-400 mr-2">#{idx + 1}</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200">{item.name}</span>
-                      </div>
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 font-extrabold text-[10px]">{item.mealsSaved} meals</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* NGO Performance Card */}
-            <div className="p-6 bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm space-y-4 text-left">
-              <h3 className="text-sm font-bold text-blue-500">🏢 NGO Performance Index</h3>
-              <p className="text-[10px] text-slate-500">Highest rescue completion rates</p>
-              
-              <div className="space-y-3 pt-2">
-                {(!analytics.ngoPerformance || analytics.ngoPerformance.length === 0) ? (
-                  <p className="text-slate-500 text-xs italic">No claims yet.</p>
-                ) : (
-                  analytics.ngoPerformance.slice(0, 5).map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between border-b border-slate-50 dark:border-slate-800/50 pb-2">
-                      <div className="text-xs">
-                        <span className="font-bold text-slate-400 mr-2">#{idx + 1}</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200">{item.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-slate-800 dark:text-slate-200 text-[10px]">{item.completedCount} / {item.acceptedCount} done</div>
-                        <div className="text-[9px] text-blue-600 font-bold">{item.ratio}% Ratio</div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Volunteer Activity Card */}
-            <div className="p-6 bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm space-y-4 text-left">
-              <h3 className="text-sm font-bold text-orange-500">🛵 Logistics Volunteers</h3>
-              <p className="text-[10px] text-slate-500">Top courier delivery completion counts</p>
-              
-              <div className="space-y-3 pt-2">
-                {(!analytics.volunteerPerformance || analytics.volunteerPerformance.length === 0) ? (
-                  <p className="text-slate-500 text-xs italic">No delivery drives yet.</p>
-                ) : (
-                  analytics.volunteerPerformance.slice(0, 5).map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between border-b border-slate-50 dark:border-slate-800/50 pb-2">
-                      <div className="text-xs">
-                        <span className="font-bold text-slate-400 mr-2">#{idx + 1}</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200">{item.name}</span>
-                      </div>
-                      <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-600 font-bold text-[10px]">{item.completedCount} trips</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Printable Offline PDF Report Header block */}
-          <div className="print-only hidden p-10 space-y-8 bg-white text-black border-2 border-slate-300 rounded-xl">
-            <div className="flex justify-between items-center border-b pb-4">
-              <div>
-                <h1 className="text-2xl font-bold">FoodBridge Platform Audit Summary</h1>
-                <p className="text-xs text-slate-500">Platform Analytics and Performance Report</p>
-              </div>
-              <div className="text-right text-xs">
-                <p><b>Date:</b> {new Date().toLocaleDateString()}</p>
-                <p><b>Status:</b> SECURED & APPROVED</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 gap-4 text-center">
-              <div className="p-3 border rounded">
-                <span className="text-[9px] uppercase font-bold text-slate-400">Total Meals Saved</span>
-                <p className="text-lg font-bold">{analytics.totalMealsSaved}</p>
-              </div>
-              <div className="p-3 border rounded">
-                <span className="text-[9px] uppercase font-bold text-slate-400">Total Listings</span>
-                <p className="text-lg font-bold">{analytics.totalDonations}</p>
-              </div>
-              <div className="p-3 border rounded">
-                <span className="text-[9px] uppercase font-bold text-slate-400">Approved NGOs</span>
-                <p className="text-lg font-bold">{analytics.activeNgos}</p>
-              </div>
-              <div className="p-3 border rounded">
-                <span className="text-[9px] uppercase font-bold text-slate-400">Active Couriers</span>
-                <p className="text-lg font-bold">{analytics.activeVolunteers}</p>
-              </div>
-            </div>
+          <div>
+            <span className="text-2xl font-black text-slate-800 dark:text-white block">{totalDonations}</span>
+            <span className="text-xs text-slate-400 font-bold uppercase">Total Donations</span>
           </div>
         </div>
-      )}
 
-      {/* APPROVALS QUEUE VIEW */}
-      {view === 'verifications' && (
-        <div className="bg-white dark:bg-darkBg-secondary p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 animate-fade-in">
-          <h3 className="text-lg font-bold dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3">NGO Verification List</h3>
-          
-          <div className="overflow-x-auto">
-            {fetching ? (
-              <p>Loading queue...</p>
-            ) : pendingNgos.length === 0 ? (
-              <p className="text-slate-500 text-xs italic py-4">Approvals queue is clear. No pending NGOs.</p>
-            ) : (
-              <table className="w-full text-xs text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold bg-slate-50 dark:bg-darkBg-primary/30">
-                    <th className="p-3">Agency Name</th>
-                    <th className="p-3">Registration No.</th>
-                    <th className="p-3">Contact Person</th>
-                    <th className="p-3">Office Address</th>
-                    <th className="p-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingNgos.map(ngo => (
-                    <tr key={ngo._id || ngo.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-darkBg-primary/20">
-                      <td className="p-3 font-bold text-slate-800 dark:text-slate-200">{ngo.name}</td>
-                      <td className="p-3"><code>{ngo.ngoDetails?.regNo}</code></td>
-                      <td className="p-3">{ngo.ngoDetails?.contactPerson}</td>
-                      <td className="p-3">{ngo.ngoDetails?.address}</td>
-                      <td className="p-3">
-                        <div className="flex gap-2">
-                          <button className="px-2.5 py-1 rounded bg-emerald-500 text-white font-bold text-[10px]" onClick={() => handleVerify(ngo._id || ngo.id, 'approved')}>
-                            Approve
-                          </button>
-                          <button className="px-2.5 py-1 rounded bg-red-500 text-white font-bold text-[10px]" onClick={() => handleVerify(ngo._id || ngo.id, 'rejected')}>
-                            Reject
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+        {/* Metric 2: Pending */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 shadow-md flex items-center gap-4 text-left">
+          <div className="w-12 h-12 rounded-xl bg-yellow-500/10 text-yellow-500 flex items-center justify-center flex-shrink-0 border border-yellow-500/20">
+            <Clock size={24} />
+          </div>
+          <div>
+            <span className="text-2xl font-black text-slate-800 dark:text-white block">{pendingCount}</span>
+            <span className="text-xs text-slate-400 font-bold uppercase">Pending</span>
           </div>
         </div>
-      )}
 
-      {/* USERS DIRECTORY VIEW */}
-      {view === 'users' && (
-        <div className="bg-white dark:bg-darkBg-secondary p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 animate-fade-in">
-          <h3 className="text-lg font-bold dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3">User Directory</h3>
-          
-          <div className="flex flex-wrap gap-3 pb-2 items-center">
-            <div className="flex-1 min-w-[200px] relative">
-              <Search className="absolute left-2.5 top-2.5 text-slate-400" size={16} />
-              <input 
-                type="text" 
-                placeholder="Search user email or name..." 
-                className="form-control pl-8 text-xs py-2"
-                value={userSearch}
-                onChange={e => setUserSearch(e.target.value)}
-              />
-            </div>
-            
-            <select 
-              className="form-control text-xs w-36 form-select py-2"
-              value={roleFilter}
-              onChange={e => setRoleFilter(e.target.value)}
-            >
-              <option value="">All Roles</option>
-              <option value="donor">Donors</option>
-              <option value="ngo">NGOs</option>
-              <option value="volunteer">Volunteers</option>
-              <option value="admin">Admins</option>
-            </select>
+        {/* Metric 3: Accepted */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 shadow-md flex items-center gap-4 text-left">
+          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center flex-shrink-0 border border-emerald-500/20">
+            <CheckCircle2 size={24} />
           </div>
+          <div>
+            <span className="text-2xl font-black text-slate-800 dark:text-white block">{acceptedCount}</span>
+            <span className="text-xs text-slate-400 font-bold uppercase">Accepted</span>
+          </div>
+        </div>
 
+        {/* Metric 4: Rejected */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 shadow-md flex items-center gap-4 text-left">
+          <div className="w-12 h-12 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center flex-shrink-0 border border-red-500/20">
+            <XCircle size={24} />
+          </div>
+          <div>
+            <span className="text-2xl font-black text-slate-800 dark:text-white block">{rejectedCount}</span>
+            <span className="text-xs text-slate-400 font-bold uppercase">Rejected</span>
+          </div>
+        </div>
+
+        {/* Metric 5: NGOs */}
+        <div className="p-6 rounded-2xl bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 shadow-md flex items-center gap-4 text-left col-span-2 lg:col-span-1">
+          <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center flex-shrink-0 border border-indigo-500/20">
+            <Building2 size={24} />
+          </div>
+          <div>
+            <span className="text-2xl font-black text-slate-800 dark:text-white block">{ngoCount}</span>
+            <span className="text-xs text-slate-400 font-bold uppercase">Total NGOs</span>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Donation History Table */}
+      <div className="glass-panel rounded-2xl bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden transition-all duration-300">
+        
+        <div className="p-6 border-b border-slate-100 dark:border-slate-800 text-left flex items-center gap-2">
+          <ClipboardList className="text-indigo-500" size={20} />
+          <h3 className="font-extrabold text-slate-800 dark:text-white">Donation History Directory</h3>
+        </div>
+
+        {loading ? (
+          <div className="p-24 text-center">
+            <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-xs text-slate-500">Querying MongoDB documents...</p>
+          </div>
+        ) : donations.length === 0 ? (
+          <div className="p-16 text-center text-slate-500 text-sm">
+            No history logs registered in database yet.
+          </div>
+        ) : (
           <div className="overflow-x-auto">
-            {fetching ? (
-              <p>Loading users...</p>
-            ) : (
-              <table className="w-full text-xs text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold bg-slate-50 dark:bg-darkBg-primary/30">
-                    <th className="p-3">User Name</th>
-                    <th className="p-3">Email Address</th>
-                    <th className="p-3">Phone</th>
-                    <th className="p-3">Portal Role</th>
-                    <th className="p-3">Verified Status</th>
-                    <th className="p-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map(u => (
-                    <tr key={u._id || u.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-darkBg-primary/20">
-                      <td className="p-3 font-bold text-slate-800 dark:text-slate-200">{u.name}</td>
-                      <td className="p-3">{u.email}</td>
-                      <td className="p-3">{u.phone}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                          u.role === 'donor' ? 'bg-emerald-500/10 text-emerald-600' :
-                          u.role === 'ngo' ? 'bg-blue-500/10 text-blue-600' :
-                          u.role === 'volunteer' ? 'bg-orange-500/10 text-orange-600' :
-                          'bg-purple-500/10 text-purple-600'
-                        }`}>{u.role.toUpperCase()}</span>
+            <table className="w-full text-left text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-darkBg-primary text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                  <th className="p-4">Date</th>
+                  <th className="p-4">Donor Details</th>
+                  <th className="p-4">Food & Quantity</th>
+                  <th className="p-4">NGO Claim Status</th>
+                  <th className="p-4">Claimed By</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {donations.map(d => {
+                  const createdDate = new Date(d.createdAt).toLocaleDateString();
+                  return (
+                    <tr key={d._id || d.id} className="hover:bg-slate-50/50 dark:hover:bg-darkBg-primary/20 transition-colors">
+                      <td className="p-4 text-xs font-medium text-slate-400">{createdDate}</td>
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800 dark:text-white">{d.donorName}</div>
+                        <div className="text-xs text-slate-400">{d.phone} {d.organisationName && `| ${d.organisationName}`}</div>
                       </td>
-                      <td className="p-3">
-                        <span className={`badge badge-${u.isVerified || u.role === 'volunteer' || u.role === 'admin' ? 'success' : 'pending'}`}>
-                          {u.isVerified || u.role === 'volunteer' || u.role === 'admin' ? 'VERIFIED' : 'PENDING'}
+                      <td className="p-4">
+                        <div className="font-extrabold text-slate-800 dark:text-white">{d.foodName}</div>
+                        <div className="text-xs text-slate-400">{d.quantity} (Serves {d.peopleServed})</div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                          d.status === 'accepted' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                          d.status === 'rejected' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                          'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+                        }`}>
+                          {d.status}
                         </span>
                       </td>
-                      <td className="p-3">
-                        {u.role !== 'admin' && (
-                          <button 
-                            className="text-red-500 hover:text-red-600 transition flex items-center gap-0.5 bg-transparent border-none cursor-pointer font-bold text-xs"
-                            onClick={() => handleDeleteUser(u._id || u.id)}
-                          >
-                            <Trash2 size={12} /> Disable
-                          </button>
-                        )}
+                      <td className="p-4 font-bold text-indigo-500 dark:text-indigo-400">
+                        {d.acceptedBy || '—'}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
-      {/* PICKUP & OTP LOGS VIEW */}
-      {view === 'pickup-logs' && (
-        <div className="bg-white dark:bg-darkBg-secondary p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4 animate-fade-in text-left">
-          <h3 className="text-lg font-bold dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3">Secure Pickup Handshake & OTP Logs</h3>
-          
-          <div className="overflow-x-auto">
-            {fetching ? (
-              <p>Loading security audit logs...</p>
-            ) : (!analytics.auditLogs || analytics.auditLogs.filter(log => ['PICKUP_VERIFY_SUCCESS', 'PICKUP_VERIFY_FAIL', 'PICKUP_VERIFY_LOCK'].includes(log.action)).length === 0) ? (
-              <p className="text-slate-500 text-xs italic py-4">No pickup verification events logged yet.</p>
-            ) : (
-              <table className="w-full text-xs text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold bg-slate-50 dark:bg-darkBg-primary/30">
-                    <th className="p-3">Log Time</th>
-                    <th className="p-3">Verify Action</th>
-                    <th className="p-3">Account Email</th>
-                    <th className="p-3">Description Details & Proximity Location</th>
-                    <th className="p-3">IP Address</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {analytics.auditLogs
-                    .filter(log => ['PICKUP_VERIFY_SUCCESS', 'PICKUP_VERIFY_FAIL', 'PICKUP_VERIFY_LOCK'].includes(log.action))
-                    .map(log => (
-                      <tr key={log._id || log.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-darkBg-primary/20">
-                        <td className="p-3 whitespace-nowrap text-slate-500">{new Date(log.timestamp).toLocaleString()}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                            log.action === 'PICKUP_VERIFY_SUCCESS' ? 'bg-emerald-500/10 text-emerald-600' :
-                            log.action === 'PICKUP_VERIFY_FAIL' ? 'bg-orange-500/10 text-orange-600' :
-                            'bg-red-500/10 text-red-600'
-                          }`}>{log.action.replace('PICKUP_VERIFY_', '')}</span>
-                        </td>
-                        <td className="p-3 font-semibold">{log.email || 'N/A'}</td>
-                        <td className="p-3 text-slate-600 dark:text-slate-400">{log.details}</td>
-                        <td className="p-3 font-mono text-[10px] text-slate-400">{log.ipAddress || 'unknown'}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
+
     </div>
   );
 }

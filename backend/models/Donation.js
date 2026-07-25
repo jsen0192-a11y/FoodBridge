@@ -1,22 +1,36 @@
 const mongoose = require('mongoose');
 
 const DonationSchema = new mongoose.Schema({
-  donor: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+  donorName: {
+    type: String,
+    required: true
+  },
+  organisationName: {
+    type: String,
+    default: ''
+  },
+  phone: {
+    type: String,
     required: true
   },
   foodName: {
     type: String,
     required: true
   },
+  category: {
+    type: String,
+    default: 'General'
+  },
   quantity: {
-    type: String, 
+    type: String,
     required: true
   },
-  foodType: {
+  peopleServed: {
+    type: Number,
+    required: true
+  },
+  pickupAddress: {
     type: String,
-    enum: ['veg', 'non-veg'],
     required: true
   },
   pickupTime: {
@@ -27,26 +41,13 @@ const DonationSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
-  address: {
-    type: String,
+  latitude: {
+    type: Number,
     required: true
   },
-  // Backward compatible coordinates
-  coordinates: {
-    lat: { type: Number, required: true },
-    lng: { type: Number, required: true }
-  },
-  // GeoJSON coordinate matching structure for MongoDB geospatial indexes
-  location: {
-    type: {
-      type: String,
-      enum: ['Point'],
-      default: 'Point'
-    },
-    coordinates: {
-      type: [Number], // [lng, lat]
-      required: true
-    }
+  longitude: {
+    type: Number,
+    required: true
   },
   image: {
     type: String,
@@ -54,79 +55,26 @@ const DonationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'picked_up', 'delivered', 'cancelled'],
+    enum: ['pending', 'accepted', 'rejected'],
     default: 'pending'
   },
-  assignedNGO: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
-  },
-  acceptedTime: {
-    type: Date,
-    default: null
-  },
-  assignedVolunteer: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
-  },
-  // Pickup verification fields
-  pickupId: {
+  acceptedBy: {
     type: String,
     default: ''
   },
-  pickupOTP: {
+  
+  // Backward compatibility fields for routing/socket events
+  donor: {
     type: String,
-    default: ''
+    default: 'anonymous'
   },
-  otpExpiry: {
-    type: Date,
-    default: null
+  coordinates: {
+    lat: { type: Number },
+    lng: { type: Number }
   },
-  otpVerified: {
-    type: Boolean,
-    default: false
-  },
-  otpVerifiedAt: {
-    type: Date,
-    default: null
-  },
-  assignedVehicle: {
-    type: String,
-    default: ''
-  },
-  driverName: {
-    type: String,
-    default: ''
-  },
-  driverPhone: {
-    type: String,
-    default: ''
-  },
-  verificationAttempts: {
-    type: Number,
-    default: 0
-  },
-  verificationLocked: {
-    type: Boolean,
-    default: false
-  },
-  verificationLocation: {
-    lat: { type: Number, default: null },
-    lng: { type: Number, default: null }
-  },
-  verificationIp: {
-    type: String,
-    default: ''
-  },
-  // AI Metrics (Gemini classification data)
-  aiMetadata: {
-    freshnessScore: { type: Number, default: null },
-    category: { type: String, default: 'General' },
-    predictedExpiry: { type: Date, default: null },
-    isSpam: { type: Boolean, default: false },
-    spamReason: { type: String, default: '' }
+  location: {
+    type: { type: String, default: 'Point' },
+    coordinates: { type: [Number] } // [lng, lat]
   }
 }, {
   timestamps: true
@@ -135,8 +83,5 @@ const DonationSchema = new mongoose.Schema({
 // Configure Indexes
 DonationSchema.index({ location: '2dsphere' });
 DonationSchema.index({ status: 1 });
-DonationSchema.index({ donor: 1 });
-DonationSchema.index({ assignedNGO: 1 });
-DonationSchema.index({ assignedVolunteer: 1 });
 
 module.exports = mongoose.model('Donation', DonationSchema);

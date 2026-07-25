@@ -12,6 +12,9 @@ module.exports = {
     io = ioInstance;
     console.log("⚡ Socket.io Helper Initialized");
   },
+  getIo() {
+    return io;
+  },
 
   registerSocketEvents(socket) {
     // 1. Join room

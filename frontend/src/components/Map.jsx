@@ -246,8 +246,6 @@ export default function Map({
     }
   }, [markers, routeCoordinates, useGoogleMaps]);
 
-  return null;
-
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       {useGoogleMaps ? (
