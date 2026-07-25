@@ -57,6 +57,7 @@ export default function NgoDashboard() {
   
   // Real-Time Notification Toast State
   const [toastNotification, setToastNotification] = useState(null);
+  const [activeTab, setActiveTab] = useState('available'); // 'available' | 'history'
 
   // Fetch NGO current location on mount
   useEffect(() => {
@@ -541,139 +542,217 @@ export default function NgoDashboard() {
       <div className="grid lg:grid-cols-12 gap-8">
         
         {/* Left column: available and claimed lists */}
-        <div className="lg:col-span-7 space-y-8">
+        <div className="lg:col-span-7 space-y-8 animate-fade-in">
           
-          {/* Section: Available surplus listings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
-              <Flame className="text-orange-500" /> Available Donations ({availableDonations.length})
-            </h3>
+          {/* Navigation Tabs */}
+          <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-darkBg-primary p-1 rounded-xl">
+            <button
+              onClick={() => setActiveTab('available')}
+              className={`py-2.5 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === 'available'
+                  ? 'bg-white dark:bg-darkBg-secondary text-indigo-500 shadow-sm border border-slate-150 dark:border-slate-800'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Flame size={14} className={activeTab === 'available' ? 'text-orange-500' : ''} />
+              <span>Available listings ({availableDonations.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`py-2.5 text-xs font-black rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === 'history'
+                  ? 'bg-white dark:bg-darkBg-secondary text-indigo-500 shadow-sm border border-slate-150 dark:border-slate-800'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Check size={14} className={activeTab === 'history' ? 'text-emerald-500' : ''} />
+              <span>Claims History Logs ({claimedDonations.length})</span>
+            </button>
+          </div>
 
-            {loading ? (
-              <div className="p-12 text-center">
-                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                <p className="text-xs text-slate-500">Querying available food donations...</p>
-              </div>
-            ) : availableDonations.length === 0 ? (
-              <div className="p-8 text-center bg-slate-50 dark:bg-darkBg-secondary rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-500 text-sm">
-                No active food donations available right now. Check back shortly.
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {availableDonations.map(donation => {
-                  const dist = getDistance(ngoLat, ngoLng, donation.latitude, donation.longitude);
-                  return (
-                    <div 
-                      key={donation._id || donation.id}
-                      className="p-6 rounded-2xl bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 shadow-md hover:shadow-lg transition-all flex flex-col md:flex-row gap-6 relative"
-                    >
-                      {/* Donation Image */}
-                      {donation.image ? (
-                        <img 
-                          src={donation.image} 
-                          alt="Surplus Food" 
-                          className="w-full md:w-32 h-32 object-cover rounded-xl border border-slate-100 dark:border-slate-800 flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-full md:w-32 h-32 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 flex items-center justify-center rounded-xl font-black text-3xl border border-indigo-500/20 flex-shrink-0">
-                          🥗
-                        </div>
-                      )}
+          {activeTab === 'available' ? (
+            <div className="space-y-4">
+              <h3 className="text-sm font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                <Flame className="text-orange-500 animate-pulse" size={16} /> Available Distributions
+              </h3>
 
-                      {/* Content details */}
-                      <div className="flex-1 space-y-2 text-left">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/20 mb-1">
-                              {donation.category}
-                            </span>
-                            <h4 className="text-lg font-black text-slate-800 dark:text-white">{donation.foodName}</h4>
+              {loading ? (
+                <div className="p-12 text-center">
+                  <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                  <p className="text-xs text-slate-500">Querying available food donations...</p>
+                </div>
+              ) : availableDonations.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 dark:bg-darkBg-secondary rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-500 text-sm">
+                  No active food donations available right now. Check back shortly.
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {availableDonations.map(donation => {
+                    const dist = getDistance(ngoLat, ngoLng, donation.latitude, donation.longitude);
+                    return (
+                      <div 
+                        key={donation._id || donation.id}
+                        className="p-6 rounded-2xl bg-white dark:bg-darkBg-secondary border border-slate-100 dark:border-slate-800 shadow-md hover:shadow-lg transition-all flex flex-col md:flex-row gap-6 relative"
+                      >
+                        {/* Donation Image */}
+                        {donation.image ? (
+                          <img 
+                            src={donation.image} 
+                            alt="Surplus Food" 
+                            className="w-full md:w-32 h-32 object-cover rounded-xl border border-slate-100 dark:border-slate-800 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-full md:w-32 h-32 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 flex items-center justify-center rounded-xl font-black text-3xl border border-indigo-500/20 flex-shrink-0">
+                            🥗
+                          </div>
+                        )}
+
+                        {/* Content details */}
+                        <div className="flex-1 space-y-2 text-left">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/20 mb-1">
+                                {donation.category}
+                              </span>
+                              <h4 className="text-lg font-black text-slate-800 dark:text-white">{donation.foodName}</h4>
+                            </div>
+                            
+                            {/* Distance badge */}
+                            <div className="text-right">
+                              <span className="text-xs font-black text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-lg border border-indigo-500/20 flex items-center gap-1">
+                                <MapPin size={12} /> {dist} km away
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <p><b>Donor:</b> {donation.donorName}</p>
+                            <p><b>Quantity:</b> {donation.quantity}</p>
+                            <p><b>Serves:</b> {donation.peopleServed} Meals</p>
+                            <p><b>Phone:</b> {donation.phone}</p>
                           </div>
                           
-                          {/* Distance badge */}
-                          <div className="text-right">
-                            <span className="text-xs font-black text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-lg border border-indigo-500/20 flex items-center gap-1">
-                              <MapPin size={12} /> {dist} km away
-                            </span>
+                          <p className="text-xs text-slate-400 truncate">
+                            <b>Address:</b> {donation.pickupAddress}
+                          </p>
+
+                          <div className="flex items-center gap-2 pt-2 text-[10px] text-slate-400">
+                            <Clock size={12} />
+                            <span>Deadline: {new Date(donation.pickupTime).toLocaleTimeString()}</span>
                           </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 dark:text-slate-400">
-                          <p><b>Donor:</b> {donation.donorName}</p>
-                          <p><b>Quantity:</b> {donation.quantity}</p>
-                          <p><b>Serves:</b> {donation.peopleServed} Meals</p>
-                          <p><b>Phone:</b> {donation.phone}</p>
-                        </div>
-                        
-                        <p className="text-xs text-slate-400 truncate">
-                          <b>Address:</b> {donation.pickupAddress}
-                        </p>
+                          {/* Action buttons */}
+                          <div className="flex gap-2 pt-2">
+                            <button
+                              onClick={() => setSelectedDonation(donation)}
+                              className="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-darkBg-primary rounded-lg flex items-center gap-1 hover:bg-slate-200"
+                            >
+                              <Eye size={14} /> View Location
+                            </button>
+                            <button
+                              onClick={() => handleAccept(donation._id || donation.id)}
+                              className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg flex items-center gap-1"
+                            >
+                              <Check size={14} /> Accept Claim
+                            </button>
+                            <button
+                              onClick={() => handleReject(donation._id || donation.id)}
+                              className="px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/10 rounded-lg flex items-center gap-1"
+                            >
+                              <X size={14} /> Reject
+                            </button>
+                          </div>
 
-                        <div className="flex items-center gap-2 pt-2 text-[10px] text-slate-400">
-                          <Clock size={12} />
-                          <span>Deadline: {new Date(donation.pickupTime).toLocaleTimeString()}</span>
                         </div>
-
-                        {/* Action buttons */}
-                        <div className="flex gap-2 pt-2">
-                          <button
-                            onClick={() => setSelectedDonation(donation)}
-                            className="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-darkBg-primary rounded-lg flex items-center gap-1 hover:bg-slate-200"
-                          >
-                            <Eye size={14} /> View Location
-                          </button>
-                          <button
-                            onClick={() => handleAccept(donation._id || donation.id)}
-                            className="px-3 py-1.5 text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg flex items-center gap-1"
-                          >
-                            <Check size={14} /> Accept Claim
-                          </button>
-                          <button
-                            onClick={() => handleReject(donation._id || donation.id)}
-                            className="px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-500/10 rounded-lg flex items-center gap-1"
-                          >
-                            <X size={14} /> Reject
-                          </button>
-                        </div>
-
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h3 className="text-sm font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                <Check className="text-emerald-500" size={16} /> Claims History Directory
+              </h3>
 
-          {/* Section: Claims History (Accepted by this agency) */}
-          <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
-              <Check size={18} className="text-emerald-500" /> Claims History ({claimedDonations.length})
-            </h3>
-            
-            {claimedDonations.length === 0 ? (
-              <p className="text-xs text-slate-400">No active claimed distributions currently.</p>
-            ) : (
-              <div className="grid gap-3">
-                {claimedDonations.map(donation => (
-                  <div 
-                    key={donation._id || donation.id}
-                    className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 flex justify-between items-center text-left"
-                  >
-                    <div>
-                      <h4 className="text-sm font-extrabold text-slate-800 dark:text-white">{donation.foodName}</h4>
-                      <p className="text-xs text-slate-400 mt-1">Accepted by you. Ready for pickup at: {donation.pickupAddress}</p>
-                    </div>
-                    <button
-                      onClick={() => setSelectedDonation(donation)}
-                      className="px-3 py-1 bg-emerald-500 text-white font-bold text-xs rounded hover:bg-emerald-600"
-                    >
-                      Inspect Route
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+              {claimedDonations.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 dark:bg-darkBg-secondary rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-500 text-sm">
+                  You haven't claimed any surplus food donations yet.
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {claimedDonations.map(donation => {
+                    const dist = getDistance(ngoLat, ngoLng, donation.latitude, donation.longitude);
+                    return (
+                      <div 
+                        key={donation._id || donation.id}
+                        className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 shadow-md hover:shadow-lg transition-all flex flex-col md:flex-row gap-6 relative"
+                      >
+                        {/* Donation Image */}
+                        {donation.image ? (
+                          <img 
+                            src={donation.image} 
+                            alt="Claimed Food" 
+                            className="w-full md:w-32 h-32 object-cover rounded-xl border border-emerald-500/10 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-full md:w-32 h-32 bg-emerald-500/10 text-emerald-500 flex items-center justify-center rounded-xl font-black text-3xl border border-emerald-500/20 flex-shrink-0">
+                            🥗
+                          </div>
+                        )}
+
+                        {/* Content details */}
+                        <div className="flex-1 space-y-2 text-left">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/20 mb-1">
+                                {donation.category}
+                              </span>
+                              <h4 className="text-lg font-black text-slate-800 dark:text-white">{donation.foodName}</h4>
+                            </div>
+                            
+                            <div className="text-right">
+                              <span className="text-xs font-black text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
+                                Claimed
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <p><b>Donor:</b> {donation.donorName}</p>
+                            <p><b>Quantity:</b> {donation.quantity}</p>
+                            <p><b>Serves:</b> {donation.peopleServed} Meals</p>
+                            <p><b>Phone:</b> {donation.phone}</p>
+                          </div>
+                          
+                          <p className="text-xs text-slate-400 truncate">
+                            <b>Address:</b> {donation.pickupAddress}
+                          </p>
+
+                          <div className="flex items-center gap-2 pt-2 text-[10px] text-slate-400">
+                            <Clock size={12} />
+                            <span>Deadline: {new Date(donation.pickupTime).toLocaleTimeString()}</span>
+                          </div>
+
+                          {/* Action buttons */}
+                          <div className="flex gap-2 pt-2">
+                            <button
+                              onClick={() => setSelectedDonation(donation)}
+                              className="px-4 py-2 text-xs font-bold text-indigo-500 hover:text-indigo-600 bg-indigo-500/10 rounded-lg flex items-center gap-1"
+                            >
+                              <Eye size={14} /> View Location / Route Polyline
+                            </button>
+                          </div>
+
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
 

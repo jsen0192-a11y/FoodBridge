@@ -128,7 +128,10 @@ export default function Navbar() {
         
         @media (max-width: 768px) {
           .navbar-links {
-            display: none;
+            gap: 1rem;
+          }
+          .nav-link {
+            font-size: 0.8rem;
           }
         }
       `}</style>

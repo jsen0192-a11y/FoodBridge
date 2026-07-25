@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Navbar from './components/Navbar';
-import Sidebar from './components/Sidebar';
 import Landing from './pages/Landing';
 import DonorDashboard from './pages/DonorDashboard';
 import NgoDashboard from './pages/NgoDashboard';
@@ -17,8 +16,7 @@ function ProtectedRoute({ children }) {
 // Side-by-Side Dashboard Layout Wrapper
 function DashboardLayout({ children, role }) {
   return (
-    <div className="dashboard-grid animate-fade-in">
-      <Sidebar role={role} />
+    <div className="dashboard-grid animate-fade-in" style={{ gridTemplateColumns: '1fr' }}>
       <main className="dashboard-content">
         {children}
       </main>
